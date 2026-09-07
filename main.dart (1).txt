@@ -1,0 +1,1508 @@
+// ============================================================================
+// File: lib/main.dart
+// Description: Complete Single-File Flutter Roadside Bike Mechanic Booking App
+// Compatible with: Flutter 3.x / Dart 3.x (Null-Safe)
+// Dependencies: Uses pure Flutter SDK (No external packages required to run!)
+// ============================================================================
+
+import 'package:flutter/material.dart';
+import 'dart:math' as math;
+
+void main() {
+  runApp(const RoadsideMechanicApp());
+}
+
+/// Root Application Widget
+class RoadsideMechanicApp extends StatelessWidget {
+  const RoadsideMechanicApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'MotoRescue - Roadside Mechanic',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE65100), // Amber / Emergency Orange
+          primary: const Color(0xFFE65100),
+          secondary: const Color(0xFF263238),
+          surface: Colors.white,
+          brightness: Brightness.light,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF4F6F8),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF1E293B),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        cardTheme: CardTheme(
+          elevation: 1,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: Colors.white,
+        ),
+      ),
+      home: const MainNavigationScreen(),
+    );
+  }
+}
+
+// ============================================================================
+// DATA MODELS
+// ============================================================================
+
+enum ProblemCategory {
+  flatTyre,
+  engineTrouble,
+  batteryDead,
+  chainBroken,
+  brakeIssue,
+  outOfFuel,
+  electrical,
+  generalCheck,
+}
+
+class ProblemItem {
+  final ProblemCategory category;
+  final String title;
+  final String description;
+  final IconData icon;
+  final double estimatedCost;
+  final int estimatedTimeMinutes;
+  final String? badge;
+
+  const ProblemItem({
+    required this.category,
+    required this.title,
+    required this.description,
+    required this.icon,
+    required this.estimatedCost,
+    required this.estimatedTimeMinutes,
+    this.badge,
+  });
+}
+
+class MechanicProfile {
+  final String name;
+  final String phone;
+  final double rating;
+  final int totalRescues;
+  final String vehicleModel;
+  final String vehiclePlate;
+  final String avatarUrl;
+
+  const MechanicProfile({
+    required this.name,
+    required this.phone,
+    required this.rating,
+    required this.totalRescues,
+    required this.vehicleModel,
+    required this.vehiclePlate,
+    required this.avatarUrl,
+  });
+}
+
+enum TrackingStatus {
+  dispatched,
+  onTheWay,
+  arrived,
+  inRepair,
+  completed,
+}
+
+// ============================================================================
+// MAIN NAVIGATION WRAPPER (State controller for Booking <-> Tracking)
+// ============================================================================
+
+class MainNavigationScreen extends StatefulWidget {
+  const MainNavigationScreen({super.key});
+
+  @override
+  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+}
+
+class _MainNavigationScreenState extends State<MainNavigationScreen> {
+  bool _isTracking = false;
+  ProblemItem? _bookedProblem;
+  String _selectedBike = 'Royal Enfield Classic 350';
+  bool _isEmergency = false;
+
+  final MechanicProfile _assignedMechanic = const MechanicProfile(
+    name: 'Rajesh Sharma',
+    phone: '+91 98765 43210',
+    rating: 4.9,
+    totalRescues: 384,
+    vehicleModel: 'Hero Splendor (Toolbox Van)',
+    vehiclePlate: 'DL 04 AB 8821',
+    avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150',
+  );
+
+  void _onBookMechanic(ProblemItem problem, String bike, bool emergency) {
+    setState(() {
+      _bookedProblem = problem;
+      _selectedBike = bike;
+      _isEmergency = emergency;
+      _isTracking = true;
+    });
+  }
+
+  void _onCancelBooking() {
+    setState(() {
+      _isTracking = false;
+      _bookedProblem = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isTracking && _bookedProblem != null) {
+      return MechanicTrackingScreen(
+        problem: _bookedProblem!,
+        bikeModel: _selectedBike,
+        isEmergency: _isEmergency,
+        mechanic: _assignedMechanic,
+        onCancel: _onCancelBooking,
+      );
+    }
+
+    return CustomerBookingScreen(
+      onBook: _onBookMechanic,
+    );
+  }
+}
+
+// ============================================================================
+// SCREEN 1: CUSTOMER BOOKING SCREEN (Problem Selection)
+// ============================================================================
+
+class CustomerBookingScreen extends StatefulWidget {
+  final Function(ProblemItem problem, String bike, bool emergency) onBook;
+
+  const CustomerBookingScreen({super.key, required this.onBook});
+
+  @override
+  State<CustomerBookingScreen> createState() => _CustomerBookingScreenState();
+}
+
+class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
+  final List<ProblemItem> _problems = const [
+    ProblemItem(
+      category: ProblemCategory.flatTyre,
+      title: 'Flat Tyre / Puncture',
+      description: 'Puncture repair or inner tube replacement',
+      icon: Icons.tire_repair,
+      estimatedCost: 14.00,
+      estimatedTimeMinutes: 15,
+      badge: 'Most Common',
+    ),
+    ProblemItem(
+      category: ProblemCategory.engineTrouble,
+      title: 'Engine Trouble',
+      description: 'Engine won\'t start, stalling or smoke',
+      icon: Icons.settings,
+      estimatedCost: 28.00,
+      estimatedTimeMinutes: 35,
+      badge: 'Critical',
+    ),
+    ProblemItem(
+      category: ProblemCategory.batteryDead,
+      title: 'Dead Battery',
+      description: 'Jumpstart or battery check / alternator',
+      icon: Icons.battery_alert,
+      estimatedCost: 16.00,
+      estimatedTimeMinutes: 15,
+    ),
+    ProblemItem(
+      category: ProblemCategory.chainBroken,
+      title: 'Broken / Slipped Chain',
+      description: 'Chain link fix, tension adjustment, lube',
+      icon: Icons.link,
+      estimatedCost: 19.00,
+      estimatedTimeMinutes: 20,
+    ),
+    ProblemItem(
+      category: ProblemCategory.brakeIssue,
+      title: 'Brake Failure / Jam',
+      description: 'Brake pad jammed, fluid leak, wire cut',
+      icon: Icons.do_not_disturb_on,
+      estimatedCost: 24.00,
+      estimatedTimeMinutes: 25,
+      badge: 'Urgent',
+    ),
+    ProblemItem(
+      category: ProblemCategory.outOfFuel,
+      title: 'Out of Petrol / Fuel',
+      description: '2-3 Litres emergency fuel delivery to spot',
+      icon: Icons.local_gas_station,
+      estimatedCost: 10.00,
+      estimatedTimeMinutes: 15,
+    ),
+    ProblemItem(
+      category: ProblemCategory.electrical,
+      title: 'Electrical / Spark Plug',
+      description: 'Headlight off, spark plug fouling, fuse blown',
+      icon: Icons.bolt,
+      estimatedCost: 18.00,
+      estimatedTimeMinutes: 20,
+    ),
+    ProblemItem(
+      category: ProblemCategory.generalCheck,
+      title: 'Other Breakdown',
+      description: 'Accident tow assessment or unknown noise',
+      icon: Icons.build_circle,
+      estimatedCost: 20.00,
+      estimatedTimeMinutes: 30,
+    ),
+  ];
+
+  late ProblemItem _selectedProblem;
+  String _selectedBike = 'Royal Enfield Classic 350';
+  bool _isEmergency = false;
+  final TextEditingController _notesController = TextEditingController();
+  final String _currentAddress = 'Outer Ring Road, Near Flyover Pillar 142';
+
+  final List<String> _myBikes = [
+    'Royal Enfield Classic 350',
+    'Yamaha MT-15',
+    'Honda Activa 6G',
+    'KTM Duke 250',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedProblem = _problems.first;
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _confirmAndRequest() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(_selectedProblem.icon, color: const Color(0xFFE65100), size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _selectedProblem.title,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        _selectedBike,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+            _summaryRow('Callout & Diagnosis', '\$5.00'),
+            _summaryRow('Estimated Fix Cost', '\$${_selectedProblem.estimatedCost.toStringAsFixed(2)}'),
+            if (_isEmergency)
+              _summaryRow('Emergency Roadside Priority', '\$6.00', isHighlight: true),
+            const Divider(height: 24),
+            _summaryRow(
+              'Total Estimate',
+              '\$${(_selectedProblem.estimatedCost + 5.0 + (_isEmergency ? 6.0 : 0.0)).toStringAsFixed(2)}',
+              isBold: true,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nearest mechanic is ~1.8 km away (ETA ~7 mins). Pay after repair.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  widget.onBook(_selectedProblem, _selectedBike, _isEmergency);
+                },
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.flash_on, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Confirm & Dispatch Mechanic',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {bool isBold = false, bool isHighlight = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: isBold ? 15 : 14,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isHighlight ? const Color(0xFFE65100) : Colors.black89,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isBold ? 16 : 14,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: isHighlight ? const Color(0xFFE65100) : Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: const Icon(Icons.two_wheeler, color: Color(0xFFFF9800)),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'MotoRescue Roadside',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Instant 24/7 Bike Breakdown Assistance',
+              style: TextStyle(fontSize: 11, color: Colors.white70),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Call Emergency SOS',
+            icon: const Icon(Icons.emergency, color: Colors.redAccent),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Dialing Roadside Police Helpline 112...'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Safety Notice Card
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                border: Border.all(color: const Color(0xFFFFE082)),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Color(0xFFF57F17), size: 22),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Stay safe: Move your bike to the road shoulder and keep hazard indicators on.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF5D4037)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Live Location Header Card
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.my_location, color: Colors.blue, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'YOUR BREAKDOWN LOCATION',
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _currentAddress,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      child: const Text('Change', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Bike Selector Chips
+            const Text(
+              'Select Your Two-Wheeler',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _myBikes.map((bike) {
+                  final isSelected = _selectedBike == bike;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(bike),
+                      selected: isSelected,
+                      selectedColor: const Color(0xFF1E293B),
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontSize: 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (_) => setState(() => _selectedBike = bike),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Problem Selection Title
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'What\'s the Problem?',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  'Tap to select',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Problem Selection Grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _problems.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.25,
+              ),
+              itemBuilder: (context, index) {
+                final item = _problems[index];
+                final isSelected = _selectedProblem.category == item.category;
+
+                return InkWell(
+                  onTap: () => setState(() => _selectedProblem = item),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFFFFF3E0) : Colors.white,
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFFE65100) : Colors.grey.shade200,
+                        width: isSelected ? 2 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.02),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? const Color(0xFFE65100)
+                                    : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                item.icon,
+                                size: 20,
+                                color: isSelected ? Colors.white : const Color(0xFF334155),
+                              ),
+                            ),
+                            if (item.badge != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: item.badge == 'Critical'
+                                      ? Colors.red.withOpacity(0.1)
+                                      : const Color(0xFFE65100).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.badge!,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: item.badge == 'Critical'
+                                        ? Colors.red
+                                        : const Color(0xFFE65100),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: isSelected ? const Color(0xFFE65100) : Colors.black87,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '~\$${item.estimatedCost.toStringAsFixed(0)} • ${item.estimatedTimeMinutes} min',
+                              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Emergency Priority Toggle
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isEmergency ? const Color(0xFFFFEBEE) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: _isEmergency ? Colors.red.shade300 : Colors.grey.shade200,
+                ),
+              ),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                activeColor: Colors.red,
+                title: const Text(
+                  'High Urgency / Stranded in Dark',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Prioritizes highest rated nearby mechanic dispatch',
+                  style: TextStyle(fontSize: 11),
+                ),
+                value: _isEmergency,
+                onChanged: (val) => setState(() => _isEmergency = val),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Optional Note Field
+            TextField(
+              controller: _notesController,
+              decoration: InputDecoration(
+                hintText: 'Landmark details (e.g. Near petrol pump, tyre shredded)...',
+                hintStyle: const TextStyle(fontSize: 12),
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: const Icon(Icons.edit_note, color: Colors.grey),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Action Button
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _confirmAndRequest,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.two_wheeler, size: 22),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Request Mechanic for ${_selectedProblem.title}',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// SCREEN 2: MECHANIC TRACKING VIEW (Live Animated GPS & Status)
+// ============================================================================
+
+class MechanicTrackingScreen extends StatefulWidget {
+  final ProblemItem problem;
+  final String bikeModel;
+  final bool isEmergency;
+  final MechanicProfile mechanic;
+  final VoidCallback onCancel;
+
+  const MechanicTrackingScreen({
+    super.key,
+    required this.problem,
+    required this.bikeModel,
+    required this.isEmergency,
+    required this.mechanic,
+    required this.onCancel,
+  });
+
+  @override
+  State<MechanicTrackingScreen> createState() => _MechanicTrackingScreenState();
+}
+
+class _MechanicTrackingScreenState extends State<MechanicTrackingScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  TrackingStatus _status = TrackingStatus.onTheWay;
+  double _distanceRemainingKm = 1.6;
+  int _etaMinutes = 6;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
+
+    // Listen to simulate gradual mechanic approach
+    _animController.addListener(() {
+      final progress = _animController.value;
+      if (mounted) {
+        setState(() {
+          _distanceRemainingKm = (1.6 * (1.0 - progress)).clamp(0.1, 1.6);
+          _etaMinutes = (6 * (1.0 - progress)).ceil().clamp(1, 6);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _advanceSimulationStep() {
+    setState(() {
+      switch (_status) {
+        case TrackingStatus.dispatched:
+          _status = TrackingStatus.onTheWay;
+          break;
+        case TrackingStatus.onTheWay:
+          _status = TrackingStatus.arrived;
+          _distanceRemainingKm = 0.0;
+          _etaMinutes = 0;
+          break;
+        case TrackingStatus.arrived:
+          _status = TrackingStatus.inRepair;
+          break;
+        case TrackingStatus.inRepair:
+          _status = TrackingStatus.completed;
+          break;
+        case TrackingStatus.completed:
+          _status = TrackingStatus.onTheWay;
+          break;
+      }
+    });
+  }
+
+  void _showCallDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const CircleAvatar(
+              backgroundColor: Color(0xFFE65100),
+              child: Icon(Icons.phone, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text('Call ${widget.mechanic.name}'),
+          ],
+        ),
+        content: Text('Simulated phone call to ${widget.mechanic.phone}. He is currently riding towards your location with the toolkit.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('End Call'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Calling ${widget.mechanic.name}...')),
+              );
+            },
+            child: const Text('Dial', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChatDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Message ${widget.mechanic.name}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: const Text('I am near the bridge hazard sign'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Quick message sent!')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.flash_on),
+              title: const Text('My bike hazard lights are flashing'),
+              onTap: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Quick message sent!')),
+                );
+              },
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  void _confirmCancel() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Mechanic Request?'),
+        content: const Text('The mechanic is already on the road. Free cancellation is available within the first 3 minutes.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Booking'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              Navigator.pop(ctx);
+              widget.onCancel();
+            },
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _confirmCancel,
+        ),
+        title: const Text('Live Mechanic Tracking', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+        actions: [
+          IconButton(
+            tooltip: 'Simulate Step',
+            icon: const Icon(Icons.fast_forward, color: Colors.orangeAccent),
+            onPressed: _advanceSimulationStep,
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // 1. Interactive Animated Road Map Canvas
+          Positioned.fill(
+            child: AnimatedBuilder(
+              animation: _animController,
+              builder: (context, child) {
+                return CustomPaint(
+                  painter: RoadMapPainter(
+                    progress: _status == TrackingStatus.arrived ||
+                            _status == TrackingStatus.inRepair ||
+                            _status == TrackingStatus.completed
+                        ? 1.0
+                        : _animController.value,
+                    status: _status,
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // 2. Floating Top ETA Banner
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _status == TrackingStatus.completed
+                          ? Colors.green
+                          : const Color(0xFFE65100),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _status == TrackingStatus.completed
+                          ? Icons.check
+                          : (_status == TrackingStatus.inRepair ? Icons.build : Icons.motorcycle),
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _getStatusTitle(_status),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _status == TrackingStatus.onTheWay
+                              ? 'ETA ~${_etaMinutes} mins • ${_distanceRemainingKm.toStringAsFixed(1)} km away'
+                              : _getStatusSubtitle(_status),
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.orangeAccent,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: _advanceSimulationStep,
+                    icon: const Icon(Icons.skip_next, size: 16),
+                    label: const Text('Next', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 3. Bottom Sliding Details Sheet
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, -4)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Pull pill
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Mechanic Profile Row
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: const Color(0xFFE65100),
+                        child: Text(
+                          widget.mechanic.name.substring(0, 1),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  widget.mechanic.name,
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.star, size: 12, color: Colors.amber),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        widget.mechanic.rating.toString(),
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${widget.mechanic.vehicleModel} • ${widget.mechanic.vehiclePlate}',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Action icons
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFE8F5E9),
+                          foregroundColor: Colors.green[700],
+                        ),
+                        icon: const Icon(Icons.phone),
+                        onPressed: _showCallDialog,
+                      ),
+                      const SizedBox(width: 6),
+                      IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFE3F2FD),
+                          foregroundColor: Colors.blue[700],
+                        ),
+                        icon: const Icon(Icons.chat),
+                        onPressed: _showChatDialog,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+
+                  // Progress Step Tracker
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildStepItem('Dispatched', _status.index >= 0),
+                      _buildStepDivider(_status.index >= 1),
+                      _buildStepItem('On Way', _status.index >= 1),
+                      _buildStepDivider(_status.index >= 2),
+                      _buildStepItem('Arrived', _status.index >= 2),
+                      _buildStepDivider(_status.index >= 3),
+                      _buildStepItem('In Repair', _status.index >= 3),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Problem & Bike pill
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(widget.problem.icon, color: const Color(0xFFE65100), size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.problem.title,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '${widget.bikeModel} • Estimated ~\$${widget.problem.estimatedCost.toStringAsFixed(0)}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (widget.isEmergency)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'SOS Priority',
+                              style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Bottom buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _confirmCancel,
+                          child: const Text('Cancel Request'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E293B),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _advanceSimulationStep,
+                          child: Text(_status == TrackingStatus.completed ? 'Book Again' : 'Next Stage'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getStatusTitle(TrackingStatus status) {
+    switch (status) {
+      case TrackingStatus.dispatched:
+        return 'Mechanic Assigned';
+      case TrackingStatus.onTheWay:
+        return 'Mechanic On The Way';
+      case TrackingStatus.arrived:
+        return 'Mechanic Has Arrived!';
+      case TrackingStatus.inRepair:
+        return 'Fixing Your Bike...';
+      case TrackingStatus.completed:
+        return 'Repaired Successfully!';
+    }
+  }
+
+  String _getStatusSubtitle(TrackingStatus status) {
+    switch (status) {
+      case TrackingStatus.dispatched:
+        return 'Preparing tools and starting motorbike';
+      case TrackingStatus.onTheWay:
+        return 'Riding along Highway 48 towards your spot';
+      case TrackingStatus.arrived:
+        return 'Parked beside your vehicle';
+      case TrackingStatus.inRepair:
+        return 'Inspecting tyre and diagnosing issue';
+      case TrackingStatus.completed:
+        return 'Bike tested and ready to ride!';
+    }
+  }
+
+  Widget _buildStepItem(String title, bool isDone) {
+    return Column(
+      children: [
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: isDone ? const Color(0xFFE65100) : Colors.grey[300],
+            shape: BoxShape.circle,
+          ),
+          child: isDone
+              ? const Icon(Icons.check, size: 12, color: Colors.white)
+              : null,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: isDone ? FontWeight.bold : FontWeight.normal,
+            color: isDone ? const Color(0xFFE65100) : Colors.grey,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStepDivider(bool isDone) {
+    return Expanded(
+      child: Container(
+        height: 2,
+        color: isDone ? const Color(0xFFE65100) : Colors.grey[300],
+        margin: const EdgeInsets.only(bottom: 14),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// CUSTOM PAINTER: ROAD NETWORK, ANIMATED ROUTE & MOTORCYCLE MARKER
+// ============================================================================
+
+class RoadMapPainter extends CustomPainter {
+  final double progress; // 0.0 to 1.0
+  final TrackingStatus status;
+
+  RoadMapPainter({required this.progress, required this.status});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Canvas Background (Stylized dark map terrain)
+    final bgPaint = Paint()..color = const Color(0xFF0F172A);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    // 2. Secondary roads grid
+    final minorRoadPaint = Paint()
+      ..color = const Color(0xFF1E293B)
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke;
+
+    // Horizontal & vertical grid roads
+    for (double y = 80; y < size.height; y += 100) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), minorRoadPaint);
+    }
+    for (double x = 60; x < size.width; x += 110) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), minorRoadPaint);
+    }
+
+    // 3. Main Highway / Avenue
+    final highwayPaint = Paint()
+      ..color = const Color(0xFF334155)
+      ..strokeWidth = 14.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final highwayCenterPaint = Paint()
+      ..color = const Color(0xFF475569)
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+
+    final routePath = Path();
+    // Route from Mechanic Starting Point to Customer Breakdown Point
+    final startPoint = Offset(size.width * 0.15, size.height * 0.22);
+    final bendPoint1 = Offset(size.width * 0.40, size.height * 0.22);
+    final bendPoint2 = Offset(size.width * 0.40, size.height * 0.45);
+    final endPoint = Offset(size.width * 0.82, size.height * 0.45);
+
+    routePath.moveTo(startPoint.dx, startPoint.dy);
+    routePath.lineTo(bendPoint1.dx, bendPoint1.dy);
+    routePath.lineTo(bendPoint2.dx, bendPoint2.dy);
+    routePath.lineTo(endPoint.dx, endPoint.dy);
+
+    // Draw main avenue base
+    canvas.drawPath(routePath, highwayPaint);
+    canvas.drawPath(routePath, highwayCenterPaint);
+
+    // 4. Highlighted Active Navigation Path (Emergency Orange Polyline)
+    final activeRoutePaint = Paint()
+      ..color = const Color(0xFFFF9800)
+      ..strokeWidth = 6.0
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawPath(routePath, activeRoutePaint);
+
+    // 5. Customer Breakdown Location Pin & Radar Pulse
+    final radarPaint = Paint()
+      ..color = Colors.redAccent.withOpacity(0.25)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(endPoint, 24, radarPaint);
+
+    final customerPinBase = Paint()
+      ..color = Colors.red
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(endPoint, 10, customerPinBase);
+
+    final customerPinCenter = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(endPoint, 4, customerPinCenter);
+
+    // Customer label badge
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: '📍 You (Stranded)',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Color(0xCC000000),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(canvas, Offset(endPoint.dx - 45, endPoint.dy - 32));
+
+    // 6. Calculate Moving Mechanic Position along the route
+    // Total distance parts
+    final seg1 = (bendPoint1.dx - startPoint.dx).abs();
+    final seg2 = (bendPoint2.dy - bendPoint1.dy).abs();
+    final seg3 = (endPoint.dx - bendPoint2.dx).abs();
+    final totalLen = seg1 + seg2 + seg3;
+
+    final currentDistance = totalLen * progress;
+    Offset mechanicPos;
+    double headingAngle = 0.0; // in radians
+
+    if (currentDistance <= seg1) {
+      final t = currentDistance / seg1;
+      mechanicPos = Offset.lerp(startPoint, bendPoint1, t)!;
+      headingAngle = 0.0; // moving right
+    } else if (currentDistance <= seg1 + seg2) {
+      final t = (currentDistance - seg1) / seg2;
+      mechanicPos = Offset.lerp(bendPoint1, bendPoint2, t)!;
+      headingAngle = math.pi / 2; // moving down
+    } else {
+      final t = (currentDistance - seg1 - seg2) / seg3;
+      mechanicPos = Offset.lerp(bendPoint2, endPoint, t)!;
+      headingAngle = 0.0; // moving right
+    }
+
+    // 7. Draw Mechanic Motorcycle Marker
+    canvas.save();
+    canvas.translate(mechanicPos.dx, mechanicPos.dy);
+
+    // Pulse wave around mechanic
+    final mechPulse = Paint()
+      ..color = const Color(0xFFE65100).withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset.zero, 18, mechPulse);
+
+    // Marker Disc
+    final mechDisc = Paint()
+      ..color = const Color(0xFFE65100)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset.zero, 12, mechDisc);
+
+    // White center ring
+    final mechRing = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(Offset.zero, 12, mechRing);
+
+    // Little directional indicator triangle
+    canvas.rotate(headingAngle);
+    final arrowPath = Path();
+    arrowPath.moveTo(14, 0);
+    arrowPath.lineTo(8, -5);
+    arrowPath.lineTo(8, 5);
+    arrowPath.close();
+    canvas.drawPath(arrowPath, Paint()..color = Colors.white);
+
+    canvas.restore();
+
+    // Mechanic Label floating
+    final mechLabelPainter = TextPainter(
+      text: const TextSpan(
+        text: '🏍️ Mechanic Rajesh',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          backgroundColor: Color(0xCC000000),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    mechLabelPainter.layout();
+    mechLabelPainter.paint(
+      canvas,
+      Offset(mechanicPos.dx - 50, mechanicPos.dy - 32),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant RoadMapPainter oldDelegate) {
+    return oldDelegate.progress != progress || oldDelegate.status != status;
+  }
+}
