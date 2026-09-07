@@ -2,17 +2,14 @@
 // File: lib/main.dart
 // Description: Complete Single-File Flutter Roadside Bike Mechanic Booking App
 // Compatible with: Flutter 3.x / Dart 3.x (Null-Safe)
-// Dependencies: Uses pure Flutter SDK (No external packages required to run!)
 // ============================================================================
 
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 void main() {
   runApp(const RoadsideMechanicApp());
 }
 
-/// Root Application Widget
 class RoadsideMechanicApp extends StatelessWidget {
   const RoadsideMechanicApp({super.key});
 
@@ -24,7 +21,7 @@ class RoadsideMechanicApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFE65100), // Amber / Emergency Orange
+          seedColor: const Color(0xFFE65100),
           primary: const Color(0xFFE65100),
           secondary: const Color(0xFF263238),
           surface: Colors.white,
@@ -37,7 +34,7 @@ class RoadsideMechanicApp extends StatelessWidget {
           elevation: 0,
           centerTitle: false,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 1,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           color: Colors.white,
@@ -47,10 +44,6 @@ class RoadsideMechanicApp extends StatelessWidget {
     );
   }
 }
-
-// ============================================================================
-// DATA MODELS
-// ============================================================================
 
 enum ProblemCategory {
   flatTyre,
@@ -102,10 +95,6 @@ class MechanicProfile {
     required this.avatarUrl,
   });
 }
-
-// ============================================================================
-// MAIN NAVIGATION WRAPPER (State controller for Booking <-> Tracking)
-// ============================================================================
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -163,10 +152,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 }
-
-// ============================================================================
-// SCREEN 1: CUSTOMER BOOKING SCREEN (Problem Selection)
-// ============================================================================
 
 class CustomerBookingScreen extends StatefulWidget {
   final Function(ProblemItem problem, String bike, bool emergency) onBook;
@@ -482,10 +467,6 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   }
 }
 
-// ============================================================================
-// SCREEN 2: MECHANIC TRACKING SCREEN
-// ============================================================================
-
 class MechanicTrackingScreen extends StatelessWidget {
   final ProblemItem problem;
   final String bikeModel;
@@ -568,4 +549,17 @@ class MechanicTrackingScreen extends StatelessWidget {
               width: double.infinity,
               height: 50,
               child: OutlinedButton(
-                style: OutlinedButton.st
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                ),
+                onPressed: onCancel,
+                child: const Text('Cancel Dispatch'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
