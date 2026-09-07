@@ -1,0 +1,21 @@
+workflows:
+  default-workflow:
+    name: BikeSathi24 Android Build
+    max_build_duration: 30
+    environment:
+      flutter: stable
+      android_signing:
+        - reference: keystore_reference
+    scripts:
+      - name: Initialize Flutter Project Structure
+        script: |
+          flutter create . --org com.bikesathi24.app --project-name bikesathi24 --platforms android
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+      - name: Build APK
+        script: |
+          flutter build apk --release
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      
