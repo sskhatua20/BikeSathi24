@@ -19,7 +19,7 @@ class RoadsideMechanicApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BikeSathi24 - Roadside Mechanic',
+      title: 'BikeMedic - Roadside Mechanic',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -377,7 +377,7 @@ class _CustomerBookingScreenState extends State<CustomerBookingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BikeSathi24 - Breakdown Assistance'),
+        title: const Text('BikeMedic - Breakdown Assistance'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -525,7 +525,7 @@ class MechanicTrackingScreen extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
               ),
               child: Column(
                 children: [
@@ -568,4 +568,4 @@ class MechanicTrackingScreen extends StatelessWidget {
               width: double.infinity,
               height: 50,
               child: OutlinedButton(
-                style: OutlinedButton.styl
+                style: OutlinedButton.st
