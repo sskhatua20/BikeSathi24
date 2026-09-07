@@ -1,13 +1,13 @@
 workflows:
   default-workflow:
-    name: BikeSathi24 Android Build
+    name: BikeMedic Android Build
     max_build_duration: 30
     environment:
       flutter: stable
     scripts:
       - name: Initialize Android Structure
         script: |
-          flutter create . --org com.bikesathi24.app --project-name bikesathi24 --platforms android
+          flutter create . --org com.bikemedic.app --project-name bikemedic --platforms android
       - name: Get Flutter packages
         script: |
           flutter pub get
