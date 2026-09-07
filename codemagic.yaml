@@ -4,10 +4,8 @@ workflows:
     max_build_duration: 30
     environment:
       flutter: stable
-      android_signing:
-        - reference: keystore_reference
     scripts:
-      - name: Initialize Flutter Project Structure
+      - name: Initialize Android Structure
         script: |
           flutter create . --org com.bikesathi24.app --project-name bikesathi24 --platforms android
       - name: Get Flutter packages
